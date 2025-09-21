@@ -46,9 +46,4 @@ jobs:
           project: 'SpringBootApp'
           failOnCVSS: 7   # Fails build if critical or higher vulnerabilities found (CVSS >=7)
 
-      # 6. Optionally, archive reports
-      - name: Archive Reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: dependency-check-report
-          path: build/reports/dependency-check-report.html
+
