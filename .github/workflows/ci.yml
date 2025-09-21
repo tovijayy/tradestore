@@ -1,0 +1,54 @@
+name: Spring Boot CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Set up JDK 17 (or your required version)
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # 3. Cache Gradle dependencies for faster builds
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # 4. Build and run unit & regression tests
+      - name: Build with Gradle
+        run: ./gradlew clean build --info
+
+      # 5. Run OSS vulnerability scan with OWASP Dependency Check
+      - name: Dependency Check
+        uses: dependency-check/scan@v8
+        with:
+          scan: '.'
+          format: 'ALL'
+          project: 'SpringBootApp'
+          failOnCVSS: 7   # Fails build if critical or higher vulnerabilities found (CVSS >=7)
+
+      # 6. Optionally, archive reports
+      - name: Archive Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: build/reports/dependency-check-report.html
