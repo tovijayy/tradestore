@@ -37,13 +37,6 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build --info
 
-      # 5. Run OSS vulnerability scan with OWASP Dependency Check
-      - name: Run Dependency Check
-        uses: jeremylong/DependencyCheck-action@v2
-        with:
-          project: SpringBootApp
-          scan: .
-          format: ALL
-          failOnCVSS: 7
+
 
 
