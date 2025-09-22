@@ -50,6 +50,14 @@ class TradeIntegrationTest {
         tradeRepository.save(trade);
     }
 
+    static {
+        // Override Spring properties dynamically for RabbitMQ
+        System.setProperty("spring.rabbitmq.host", rabbitMQ.getHost());
+        System.setProperty("spring.rabbitmq.port", rabbitMQ.getAmqpPort().toString());
+        System.setProperty("spring.rabbitmq.username", rabbitMQ.getAdminUsername());
+        System.setProperty("spring.rabbitmq.password", rabbitMQ.getAdminPassword());
+    }
+
 
     @Test
     void testTradeMessageConsumedAndPersisted() {
