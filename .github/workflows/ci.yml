@@ -59,34 +59,13 @@ jobs:
           ./gradlew dependencies --configuration runtimeClasspath > gradle-dependencies.txt || true
           echo "Dependencies extracted to gradle-dependencies.txt"
 
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        id: depcheck
+      # 🔍 Run Trivy Vulnerability Scan
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@0.12.0
         with:
-          project: 'spring-boot-app'
-          path: '.'
-          format: 'ALL'
-          out: 'dependency-check-reports'
-          args: >
-            --enableRetired
-            --enableExperimental
-            --nvdApiKey ${{ secrets.NVD_API_KEY }}
-            --failOnCVSS 7
-        continue-on-error: true
-
-      - name: Upload OWASP Dependency Check results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: dependency-check-reports/dependency-check-report.sarif
-
-      - name: Upload OWASP Dependency Check Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dependency-check-reports
-          path: |
-            dependency-check-reports/
-            dependency-analysis.md
-            gradle-dependencies.txt
-          retention-days: 30
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+          ignore-unfixed: true
+          format: table
+          exit-code: 1
