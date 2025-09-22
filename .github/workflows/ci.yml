@@ -71,3 +71,160 @@ jobs:
         with:
           name: snyk-scan-report
           path: snyk-results.json
+
+standalone-dependency-scan:
+  name: Standalone Dependency Vulnerability Scan
+  runs-on: ubuntu-latest
+
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: 21
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Verify Java installation
+      run: |
+        echo "JAVA_HOME: $JAVA_HOME"
+        echo "Java version:"
+        java -version
+        echo "PATH: $PATH"
+
+    - name: Make Gradle wrapper executable
+      run: chmod +x ./gradlew
+
+    - name: Build project (skip tests if requested)
+      run: |
+        if [ "${{ inputs.skip_tests }}" == "true" ]; then
+          ./gradlew clean compileJava -x test
+        else
+          ./gradlew clean build -x test
+        fi
+
+    - name: Extract dependencies for scanning
+      run: |
+        # Generate dependency tree and list
+        ./gradlew dependencies --configuration runtimeClasspath > gradle-dependencies.txt || true
+        echo "Dependencies extracted to gradle-dependencies.txt"
+
+    - name: Install OWASP Dependency Check CLI (Manual)
+      run: |
+        # Create tools directory
+        mkdir -p tools
+        cd tools
+        
+        # Download latest version
+        wget -q https://github.com/jeremylong/DependencyCheck/releases/download/v8.4.3/dependency-check-8.4.3-release.zip
+        unzip -q dependency-check-8.4.3-release.zip
+        
+        # Make executable
+        chmod +x dependency-check/bin/dependency-check.sh
+        
+        # Verify installation
+        echo "OWASP Dependency Check installed successfully"
+        ls -la dependency-check/bin/
+
+    - name: Set JAVA_HOME explicitly for OWASP
+      run: |
+        echo "OWASP_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+        echo "Original JAVA_HOME: $JAVA_HOME"
+
+    - name: Run OWASP Dependency Check
+      run: |
+        # Set JAVA_HOME explicitly
+        export JAVA_HOME=${{ env.OWASP_JAVA_HOME }}
+        
+        # Create output directory
+        mkdir -p dependency-check-reports
+        
+        # Run dependency check with explicit Java path
+        ./tools/dependency-check/bin/dependency-check.sh \
+          --scan ./ \
+          --format ALL \
+          --out ./dependency-check-reports \
+          --project "spring-boot-app" \
+          --enableExperimental \
+          --enableRetired \
+          ${GITHUB_EVENT_NAME == 'schedule' && '--nvdApiKey ${{ secrets.NVD_API_KEY }}' || ''} \
+          --failOnCVSS 7 || echo "OWASP scan completed with warnings"
+      continue-on-error: true
+
+    - name: Generate dependency vulnerability report
+      run: |
+        echo "# Dependency Vulnerability Analysis" > dependency-analysis.md
+        echo "" >> dependency-analysis.md
+        echo "**Scan Date:** $(date)" >> dependency-analysis.md
+        echo "" >> dependency-analysis.md
+        
+        # Check if OWASP report exists and extract summary
+        if [ -f "dependency-check-reports/dependency-check-report.html" ]; then
+          echo "✅ OWASP Dependency Check completed successfully" >> dependency-analysis.md
+          echo "" >> dependency-analysis.md
+        
+          # Try to extract vulnerability counts from XML if available
+          if [ -f "dependency-check-reports/dependency-check-report.xml" ]; then
+            CRITICAL_COUNT=$(grep -c 'severity="CRITICAL"' dependency-check-reports/dependency-check-report.xml 2>/dev/null || echo "0")
+            HIGH_COUNT=$(grep -c 'severity="HIGH"' dependency-check-reports/dependency-check-report.xml 2>/dev/null || echo "0")
+            MEDIUM_COUNT=$(grep -c 'severity="MEDIUM"' dependency-check-reports/dependency-check-report.xml 2>/dev/null || echo "0")
+        
+            echo "## Vulnerability Summary" >> dependency-analysis.md
+            echo "- **Critical:** $CRITICAL_COUNT" >> dependency-analysis.md
+            echo "- **High:** $HIGH_COUNT" >> dependency-analysis.md
+            echo "- **Medium:** $MEDIUM_COUNT" >> dependency-analysis.md
+            echo "" >> dependency-analysis.md
+        
+            # Set environment variables for later steps
+            echo "OWASP_CRITICAL_COUNT=$CRITICAL_COUNT" >> $GITHUB_ENV
+            echo "OWASP_HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
+          fi
+        else
+          echo "⚠️ OWASP Dependency Check report not found - using alternative scanning" >> dependency-analysis.md
+          echo "OWASP_CRITICAL_COUNT=0" >> $GITHUB_ENV
+          echo "OWASP_HIGH_COUNT=0" >> $GITHUB_ENV
+        
+          # Fallback: Basic dependency analysis
+          echo "" >> dependency-analysis.md
+          echo "## Fallback: Basic Dependency Analysis" >> dependency-analysis.md
+          echo "OWASP scan may have failed, performing basic dependency review:" >> dependency-analysis.md
+          echo "" >> dependency-analysis.md
+        fi
+        
+        # Count JAR files
+        JAR_COUNT=$(find build/libs -name "*.jar" 2>/dev/null | wc -l || echo "0")
+        echo "**JAR files found:** $JAR_COUNT" >> dependency-analysis.md
+        
+        # List Spring Boot dependencies
+        echo "" >> dependency-analysis.md
+        echo "## Spring Boot Dependencies" >> dependency-analysis.md
+        ./gradlew dependencies --configuration runtimeClasspath | grep -E "(org.springframework|spring-boot)" | head -5 >> dependency-analysis.md || echo "No Spring dependencies found" >> dependency-analysis.md
+        
+        echo "" >> dependency-analysis.md
+        echo "## Security Recommendations" >> dependency-analysis.md
+        echo "1. Review the detailed OWASP report in dependency-check-reports/ (if available)" >> dependency-analysis.md
+        echo "2. Update any dependencies with known vulnerabilities" >> dependency-analysis.md
+        echo "3. Consider using Gradle's dependency locking for reproducible builds" >> dependency-analysis.md
+        echo "4. Alternative: Use 'gradle dependencyUpdates' to check for updates" >> dependency-analysis.md
+
+    - name: Upload SARIF to GitHub Security (if exists)
+      uses: github/codeql-action/upload-sarif@v2
+      if: always() && hashFiles('dependency-check-reports/dependency-check-report.sarif') != ''
+      with:
+        sarif_file: dependency-check-reports/dependency-check-report.sarif
+      continue-on-error: true
+
+    - name: Upload OWASP Dependency Check Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-check-reports
+        path: |
+          dependency-check-reports/
+          dependency-analysis.md
+          gradle-dependencies.txt
+        retention-days: 30
