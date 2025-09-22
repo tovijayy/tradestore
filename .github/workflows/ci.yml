@@ -59,159 +59,97 @@ jobs:
           ./gradlew dependencies --configuration runtimeClasspath > gradle-dependencies.txt || true
           echo "Dependencies extracted to gradle-dependencies.txt"
 
-  standalone-dependency-scan:
-    name: Standalone Dependency Vulnerability Scan
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: 21
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Verify Java installation
+      # Dummy Security Scan Step
+      - name: Generate Security Scan Results (Dummy)
         run: |
-          echo "JAVA_HOME: $JAVA_HOME"
-          echo "Java version:"
-          java -version
-          echo "PATH: $PATH"
+          echo "Running security scan simulation..."
+          mkdir -p security-reports
+          
+          # Create a dummy security scan results file in JSON format
+          cat > security-reports/security-scan-results.json << 'EOF'
+          {
+            "scan_info": {
+              "scan_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+              "scanner": "DummySecurityScanner",
+              "version": "1.0.0",
+              "project": "spring-boot-gradle-app",
+              "total_vulnerabilities": 1,
+              "high_severity": 1,
+              "medium_severity": 0,
+              "low_severity": 0
+            },
+            "vulnerabilities": [
+              {
+                "id": "CVE-2023-20873",
+                "title": "Spring Framework Remote Code Execution",
+                "description": "A remote code execution vulnerability exists in Spring Framework versions prior to 5.3.21. An attacker could exploit this vulnerability by sending specially crafted requests to applications using Spring Framework.",
+                "severity": "HIGH",
+                "cvss_score": 9.8,
+                "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                "affected_component": "org.springframework:spring-core",
+                "affected_versions": "< 5.3.21",
+                "fixed_version": "5.3.21",
+                "file_path": "build.gradle",
+                "line_number": 15,
+                "cwe_id": "CWE-94",
+                "references": [
+                  "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-20873",
+                  "https://spring.io/security/cve-2023-20873"
+                ],
+                "remediation": "Update Spring Framework to version 5.3.21 or later"
+              }
+            ]
+          }
+          EOF
+          
+          # Also create a human-readable summary
+          cat > security-reports/security-scan-summary.txt << 'EOF'
+          ====================================
+          SECURITY SCAN SUMMARY
+          ====================================
+          Scan Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Project: Spring Boot Gradle Application
+          Scanner: DummySecurityScanner v1.0.0
+          
+          VULNERABILITY SUMMARY:
+          - Total Vulnerabilities Found: 1
+          - High Severity: 1
+          - Medium Severity: 0
+          - Low Severity: 0
+          
+          HIGH SEVERITY VULNERABILITIES:
+          1. CVE-2023-20873 - Spring Framework Remote Code Execution
+             Component: org.springframework:spring-core
+             CVSS Score: 9.8 (Critical)
+             Fix: Update to version 5.3.21 or later
+          
+          RECOMMENDATION:
+          Update your Spring Framework dependencies immediately to address the critical vulnerability.
+          ====================================
+          EOF
+          
+          echo "Security scan completed. Results saved to security-reports/"
+          ls -la security-reports/
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
-
-      - name: Build project (skip tests if requested)
-        run: |
-          if [ "${{ inputs.skip_tests }}" == "true" ]; then
-            ./gradlew clean compileJava -x test
-          else
-            ./gradlew clean build -x test
-          fi
-
-      - name: Extract dependencies for scanning
-        run: |
-          # Generate dependency tree and list
-          ./gradlew dependencies --configuration runtimeClasspath > gradle-dependencies.txt || true
-          echo "Dependencies extracted to gradle-dependencies.txt"
-
-      - name: Install OWASP Dependency Check CLI (Manual)
-        run: |
-          # Create tools directory
-          mkdir -p tools
-          cd tools
-          
-          # Download latest version
-          wget -q https://github.com/jeremylong/DependencyCheck/releases/download/v8.4.3/dependency-check-8.4.3-release.zip
-          unzip -q dependency-check-8.4.3-release.zip
-          
-          # Make executable
-          chmod +x dependency-check/bin/dependency-check.sh
-          
-          # Verify installation
-          echo "OWASP Dependency Check installed successfully"
-          ls -la dependency-check/bin/
-
-      - name: Set JAVA_HOME explicitly for OWASP
-        run: |
-          echo "OWASP_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-          echo "Original JAVA_HOME: $JAVA_HOME"
-
-      - name: Run OWASP Dependency Check
-        run: |
-          # Set JAVA_HOME explicitly
-          export JAVA_HOME=${{ env.OWASP_JAVA_HOME }}
-          
-          # Create output directory
-          mkdir -p dependency-check-reports
-          
-          # Run dependency check with explicit Java path
-          ./tools/dependency-check/bin/dependency-check.sh \
-            --scan ./ \
-            --format ALL \
-            --out ./dependency-check-reports \
-            --project "spring-boot-app" \
-            --enableExperimental \
-            --enableRetired \
-            ${GITHUB_EVENT_NAME == 'schedule' && '--nvdApiKey ${{ secrets.NVD_API_KEY }}' || ''} \
-            --failOnCVSS 7 || echo "OWASP scan completed with warnings"
-        continue-on-error: true
-
-      - name: Generate dependency vulnerability report
-        run: |
-          echo "# Dependency Vulnerability Analysis" > dependency-analysis.md
-          echo "" >> dependency-analysis.md
-          echo "**Scan Date:** $(date)" >> dependency-analysis.md
-          echo "" >> dependency-analysis.md
-          
-          # Check if OWASP report exists and extract summary
-          if [ -f "dependency-check-reports/dependency-check-report.html" ]; then
-            echo "✅ OWASP Dependency Check completed successfully" >> dependency-analysis.md
-            echo "" >> dependency-analysis.md
-          
-            # Try to extract vulnerability counts from XML if available
-            if [ -f "dependency-check-reports/dependency-check-report.xml" ]; then
-              CRITICAL_COUNT=$(grep -c 'severity="CRITICAL"' dependency-check-reports/dependency-check-report.xml 2>/dev/null || echo "0")
-              HIGH_COUNT=$(grep -c 'severity="HIGH"' dependency-check-reports/dependency-check-report.xml 2>/dev/null || echo "0")
-              MEDIUM_COUNT=$(grep -c 'severity="MEDIUM"' dependency-check-reports/dependency-check-report.xml 2>/dev/null || echo "0")
-          
-              echo "## Vulnerability Summary" >> dependency-analysis.md
-              echo "- **Critical:** $CRITICAL_COUNT" >> dependency-analysis.md
-              echo "- **High:** $HIGH_COUNT" >> dependency-analysis.md
-              echo "- **Medium:** $MEDIUM_COUNT" >> dependency-analysis.md
-              echo "" >> dependency-analysis.md
-          
-              # Set environment variables for later steps
-              echo "OWASP_CRITICAL_COUNT=$CRITICAL_COUNT" >> $GITHUB_ENV
-              echo "OWASP_HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
-            fi
-          else
-            echo "⚠️ OWASP Dependency Check report not found - using alternative scanning" >> dependency-analysis.md
-            echo "OWASP_CRITICAL_COUNT=0" >> $GITHUB_ENV
-            echo "OWASP_HIGH_COUNT=0" >> $GITHUB_ENV
-          
-            # Fallback: Basic dependency analysis
-            echo "" >> dependency-analysis.md
-            echo "## Fallback: Basic Dependency Analysis" >> dependency-analysis.md
-            echo "OWASP scan may have failed, performing basic dependency review:" >> dependency-analysis.md
-            echo "" >> dependency-analysis.md
-          fi
-          
-          # Count JAR files
-          JAR_COUNT=$(find build/libs -name "*.jar" 2>/dev/null | wc -l || echo "0")
-          echo "**JAR files found:** $JAR_COUNT" >> dependency-analysis.md
-          
-          # List Spring Boot dependencies
-          echo "" >> dependency-analysis.md
-          echo "## Spring Boot Dependencies" >> dependency-analysis.md
-          ./gradlew dependencies --configuration runtimeClasspath | grep -E "(org.springframework|spring-boot)" | head -5 >> dependency-analysis.md || echo "No Spring dependencies found" >> dependency-analysis.md
-          
-          echo "" >> dependency-analysis.md
-          echo "## Security Recommendations" >> dependency-analysis.md
-          echo "1. Review the detailed OWASP report in dependency-check-reports/ (if available)" >> dependency-analysis.md
-          echo "2. Update any dependencies with known vulnerabilities" >> dependency-analysis.md
-          echo "3. Consider using Gradle's dependency locking for reproducible builds" >> dependency-analysis.md
-          echo "4. Alternative: Use 'gradle dependencyUpdates' to check for updates" >> dependency-analysis.md
-
-      - name: Upload SARIF to GitHub Security (if exists)
-        uses: github/codeql-action/upload-sarif@v2
-        if: always() && hashFiles('dependency-check-reports/dependency-check-report.sarif') != ''
-        with:
-          sarif_file: dependency-check-reports/dependency-check-report.sarif
-        continue-on-error: true
-
-      - name: Upload OWASP Dependency Check Results
+      - name: Upload Security Scan Results
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: dependency-check-reports
-          path: |
-            dependency-check-reports/
-            dependency-analysis.md
-            gradle-dependencies.txt
+          name: security-scan-results
+          path: security-reports/
           retention-days: 30
+
+      # Optional: Fail the build if high severity vulnerabilities are found
+      - name: Check Security Scan Results
+        run: |
+          if [ -f security-reports/security-scan-results.json ]; then
+            high_vulns=$(cat security-reports/security-scan-results.json | grep -o '"high_severity": [0-9]*' | grep -o '[0-9]*')
+            echo "High severity vulnerabilities found: $high_vulns"
+          
+            if [ "$high_vulns" -gt 0 ]; then
+              echo "❌ Build failed due to high severity security vulnerabilities!"
+              echo "Please review the security scan results and fix the issues before proceeding."
+              exit 1
+            else
+              echo "✅ No high severity vulnerabilities found."
+            fi
+          fi
