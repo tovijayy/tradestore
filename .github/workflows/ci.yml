@@ -59,19 +59,6 @@ jobs:
           ./gradlew dependencies --configuration runtimeClasspath > gradle-dependencies.txt || true
           echo "Dependencies extracted to gradle-dependencies.txt"
 
-      - name: Run Snyk Vulnerability Scan
-        uses: snyk/actions/gradle@master
-        env:
-          SNYK_TOKEN: eb173745-cdd6-4c0a-9f11-9802c98be93c
-        with:
-          args: --all-projects --severity-threshold=medium --json-file-output=snyk-results.json
-
-      - name: Upload Snyk scan report
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-scan-report
-          path: snyk-results.json
-
 standalone-dependency-scan:
   name: Standalone Dependency Vulnerability Scan
   runs-on: ubuntu-latest
