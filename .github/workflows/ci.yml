@@ -69,3 +69,8 @@ jobs:
           ignore-unfixed: true
           format: table
           exit-code: 1
+
+      - name: Run Trivy JAR Scan
+        run: |
+          echo "Scanning built JAR files in build/libs/"
+          trivy fs build/libs/ --severity CRITICAL,HIGH,MEDIUM,LOW --ignore-unfixed --exit-code 1
