@@ -10,6 +10,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,9 +26,15 @@ class TradeMessageListenerTest {
     @InjectMocks
     private TradeMessageListener tradeMessageListener;
 
+    private String counterPartyId;
+    private String bookId;
+    private LocalDate maturityDate;
+    private LocalDate createdDate;
+    private char expired;
+
     @Test
     void receiveMessage_shouldProcessTrade_whenMessageIsValid() throws Exception {
-        String message = "{\"tradeId\":\"T1\",\"version\":1,\"maturityDate\":\"2023-10-10\"}";
+        String message = "{\"tradeId\":\"T1\",\"version\":1,\"counterPartyId\":\"CP-1\",\"bookId\":\"B1\",\"maturityDate\":\"2023-10-10\",\"createdDate\":\"2023-10-10\",\"expired\":\"N\"}";
         SqlTrade trade = new SqlTrade();
         trade.setTradeId("T1");
         trade.setVersion(1);
