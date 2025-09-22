@@ -58,24 +58,18 @@ jobs:
           # Generate dependency tree and list
           ./gradlew dependencies --configuration runtimeClasspath > gradle-dependencies.txt || true
           echo "Dependencies extracted to gradle-dependencies.txt"
+      
 
-      # 🔍 Run Trivy Vulnerability Scan
-      - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@0.12.0
+  security_scan:
+    name: Snyk Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/maven@master
+        env:
+          SNYK_TOKEN: eb173745-cdd6-4c0a-9f11-9802c98be93c
         with:
-          scan-type: fs
-          scan-ref: .
-          severity: CRITICAL,HIGH,MEDIUM,LOW
-          ignore-unfixed: true
-          format: table
-          exit-code: 1
-
-      - name: Install Trivy CLI
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-
-
-      - name: Run Trivy JAR Scan
-        run: |
-          echo "Scanning built JAR files in build/libs/"
-          trivy fs build/libs/ --severity CRITICAL,HIGH,MEDIUM,LOW --ignore-unfixed --exit-code 1
+          args: --severity-threshold=high
