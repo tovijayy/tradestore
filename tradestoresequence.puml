@@ -1,15 +1,18 @@
 @startuml
 actor Producer
-participant "Kafka Topic: trades" as Kafka
-participant "TradeKafkaConsumer" as Consumer
+participant "rabbitMQ queue: trades" as TradeEvents
+participant "TradeMessageListener" as Consumer
 participant "TradeService" as Service
+participant "TradeHazelcastService" as HazelcastService
 participant "TradeJpaRepository" as JPA
 participant "TradeHazelcastRepository" as HZ
 
-Producer -> Kafka: send TradeDocument
-Kafka -> Consumer: deliver message
-Consumer -> Service: storeTrade(trade)
+Producer -> TradeEvents: send TradeDocument
+TradeEvents -> Consumer: deliver message
+Consumer -> Service: processTrade(trade)
 Service -> JPA: findById(tradeId)
+Service -> HazelcastService: getTradeDocument(tradeId)
+HazelcastService -> HZ: findById(tradeId)
 alt lowerVersion
   Service -> Consumer: throw InvalidTradeException
 else ok

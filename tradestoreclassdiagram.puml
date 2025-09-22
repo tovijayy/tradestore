@@ -19,7 +19,54 @@ class TradeDocument {
   -expired:boolean
 }
 
+class TradeHazelcastService{
+    +saveTradeDocument(tradeDocument:TradeDocument):void
+    +getTradeDocument(tradeId:String):TradeDocument
+    +getAllTradeDocuments():List<TradeDocument>
+}
+
+class TradeJpaRepository{
+    +findById(tradeId:String):Optional<Trade>
+    +save(trade:Trade):Trade
+    +findAll():List<Trade>
+}
+
+class TradeHazelcastRepository{
+    +save(tradeDocument:TradeDocument):void
+    +findById(tradeId:String):TradeDocument
+    +findAll():List<TradeDocument>
+}
+
+class TradeController{
+    +getAllTrades():List<TradeDocument>
+    +getTrade(tradeId:String):TradeDocument
+}
+
+class TradeKafkaConsumer{
+    +consumeTrade(tradeDocument:TradeDocument):void
+}
+
+class Hazelcastconfig{
+    +hazelcastInstance():HazelcastInstance
+    +hazelcastConfiguration():Config
+    +tradeMap(hazelcastInstance:HazelcastInstance):IMap<String,TradeDocument>
+
+}
+
+class RabbitMQConfig{
+    exchange:String
+    queue:String
+    routingKey:String
+    +rabbitAdmin(connectionFactory:ConnectionFactory):RabbitAdmin
+    +rabbitTemplate(connectionFactory:ConnectionFactory):RabbitTemplate
+    +tradeQueue():Queue
+    +tradeExchange():DirectExchange
+    +binding(tradeQueue:Queue,tradeExchange:DirectExchange):Binding
+}
+
+
 class TradeService
+class TradeHazelcastService
 class TradeJpaRepository
 class TradeHazelcastRepository
 class TradeController
@@ -27,6 +74,7 @@ class TradeKafkaConsumer
 
 TradeService --> TradeJpaRepository
 TradeService --> TradeHazelcastRepository
+TradeService --> TradeHazelcastService
 TradeController --> TradeService
 TradeKafkaConsumer --> TradeService
 Trade <-- TradeDocument : maps to
