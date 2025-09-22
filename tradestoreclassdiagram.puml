@@ -1,0 +1,33 @@
+@startuml
+class Trade {
+  -tradeId:String
+  -version:int
+  -counterPartyId:String
+  -bookId:String
+  -maturityDate:LocalDate
+  -createdDate:LocalDate
+  -expired:boolean
+}
+
+class TradeDocument {
+  -tradeId:String
+  -version:int
+  -counterPartyId:String
+  -bookId:String
+  -maturityDate:LocalDate
+  -createdDate:LocalDate
+  -expired:boolean
+}
+
+class TradeService
+class TradeJpaRepository
+class TradeHazelcastRepository
+class TradeController
+class TradeKafkaConsumer
+
+TradeService --> TradeJpaRepository
+TradeService --> TradeHazelcastRepository
+TradeController --> TradeService
+TradeKafkaConsumer --> TradeService
+Trade <-- TradeDocument : maps to
+@enduml

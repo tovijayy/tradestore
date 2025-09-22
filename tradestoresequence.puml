@@ -1,0 +1,20 @@
+@startuml
+actor Producer
+participant "Kafka Topic: trades" as Kafka
+participant "TradeKafkaConsumer" as Consumer
+participant "TradeService" as Service
+participant "TradeJpaRepository" as JPA
+participant "TradeHazelcastRepository" as HZ
+
+Producer -> Kafka: send TradeDocument
+Kafka -> Consumer: deliver message
+Consumer -> Service: storeTrade(trade)
+Service -> JPA: findById(tradeId)
+alt lowerVersion
+  Service -> Consumer: throw InvalidTradeException
+else ok
+  Service -> JPA: save(entity)
+  Service -> HZ: save(document)
+  Service -> Consumer: ACK
+end
+@enduml
