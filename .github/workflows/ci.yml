@@ -47,5 +47,28 @@ jobs:
         run: ./gradlew clean build --info
 
 
+      - name: Install OWASP Dependency Check CLI
+        run: |
+            mkdir -p tools
+            cd tools
+            wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.4.3/dependency-check-8.4.3-release.zip
+            unzip dependency-check-8.4.3-release.zip
+            chmod +x dependency-check/bin/dependency-check.sh
 
+      - name: Run OWASP Dependency Check
+        run: |
+              ./tools/dependency-check/bin/dependency-check.sh \
+                --scan ./ \
+                --format ALL \
+                --out ./dependency-check-reports \
+                --suppression dependency-check-suppressions.xml \
+                --nvdApiKey ${{ secrets.NVD_API_KEY }} \
+                --failOnCVSS 7 || true
 
+      - name: Generate dependency vulnerability report
+        run: |
+              echo "# Dependency Vulnerability Analysis" > dependency-analysis.md
+              echo "" >> dependency-analysis.md
+              echo "**Scan Date:** $(date)" >> dependency-analysis.md
+              echo "" >> dependency-analysis.md
+    
