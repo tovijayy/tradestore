@@ -14,14 +14,17 @@ jobs:
     steps:
       # 1. Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for accurate versioning
 
       # 2. Set up JDK 17 (or your required version)
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          distribution: temurin
-          java-version: 17
+          distribution: 'temurin'
+          java-version: 21
+          cache: gradle
 
       # 3. Cache Gradle dependencies for faster builds
       - name: Cache Gradle
@@ -32,6 +35,12 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Validate Gradle configuration
+        run: ./gradlew tasks
 
       # 4. Build and run unit & regression tests
       - name: Build with Gradle
