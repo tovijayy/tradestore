@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -27,7 +29,7 @@ import org.awaitility.Awaitility;
 class TradeIntegrationTest {
 
     @Container
-    static RabbitMQContainer rabbitMQ = new RabbitMQContainer("rabbitmq:3-management");
+    static RabbitMQContainer rabbitMQContainer = new RabbitMQContainer("rabbitmq:3-management");
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -49,13 +51,12 @@ class TradeIntegrationTest {
         trade.setExpired('N');
         tradeRepository.save(trade);
     }
-
-    static {
-        // Override Spring properties dynamically for RabbitMQ
-        System.setProperty("spring.rabbitmq.host", rabbitMQ.getHost());
-        System.setProperty("spring.rabbitmq.port", rabbitMQ.getAmqpPort().toString());
-        System.setProperty("spring.rabbitmq.username", rabbitMQ.getAdminUsername());
-        System.setProperty("spring.rabbitmq.password", rabbitMQ.getAdminPassword());
+    @DynamicPropertySource
+    static void registerRabbitProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.rabbitmq.host", rabbitMQContainer::getHost);
+        registry.add("spring.rabbitmq.port", rabbitMQContainer::getAmqpPort);
+        registry.add("spring.rabbitmq.username", rabbitMQContainer::getAdminUsername);
+        registry.add("spring.rabbitmq.password", rabbitMQContainer::getAdminPassword);
     }
 
 
