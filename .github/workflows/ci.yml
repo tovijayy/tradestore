@@ -63,7 +63,7 @@ jobs:
   security_scan:
     name: Snyk Vulnerability Scan
     runs-on: ubuntu-latest
-    needs: build_and_test
+    needs: build-and-test
     steps:
       - uses: actions/checkout@v4
 
