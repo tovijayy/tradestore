@@ -4,6 +4,7 @@ import com.ninja.tradestore.entity.SqlTrade;
 import com.ninja.tradestore.model.TradeDocument;
 import com.ninja.tradestore.repository.TradeHazelcastRepository;
 import com.ninja.tradestore.repository.TradeJpaRepository;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -15,6 +16,7 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.Collection;
@@ -29,7 +31,9 @@ import org.awaitility.Awaitility;
 class TradeIntegrationTest {
 
     @Container
-    static RabbitMQContainer rabbitMQContainer = new RabbitMQContainer("rabbitmq:3-management");
+    static RabbitMQContainer rabbitMQContainer = new RabbitMQContainer("rabbitmq:3-management")
+            .withExposedPorts(5672, 15672).withStartupTimeout(Duration.ofMinutes(2)); // Explicitly expose ports
+
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -40,8 +44,15 @@ class TradeIntegrationTest {
     @Autowired
     private TradeHazelcastRepository tradeHazelcastRepository; // Hazelcast (NoSQL)
 
+    @BeforeAll
+    static void setUp() {
+        rabbitMQContainer.start();
+        System.out.println("RabbitMQ Container Logs:");
+        System.out.println(rabbitMQContainer.getLogs());
+    }
+
     @BeforeEach
-    void setUp() {
+    void setUp1() {
         SqlTrade trade = new SqlTrade();
         trade.setTradeId("T1");
         trade.setVersion(1);
@@ -53,10 +64,19 @@ class TradeIntegrationTest {
     }
     @DynamicPropertySource
     static void registerRabbitProperties(DynamicPropertyRegistry registry) {
+        // Add some logging to verify values
+        System.out.println("RabbitMQ Host: " + rabbitMQContainer.getHost());
+        System.out.println("RabbitMQ Port: " + rabbitMQContainer.getAmqpPort());
+        System.out.println("RabbitMQ Username: " + rabbitMQContainer.getAdminUsername());
+        System.out.println("RabbitMQ Password: " + rabbitMQContainer.getAdminPassword());
+
         registry.add("spring.rabbitmq.host", rabbitMQContainer::getHost);
         registry.add("spring.rabbitmq.port", rabbitMQContainer::getAmqpPort);
         registry.add("spring.rabbitmq.username", rabbitMQContainer::getAdminUsername);
         registry.add("spring.rabbitmq.password", rabbitMQContainer::getAdminPassword);
+        registry.add("spring.rabbitmq.virtual-host", () -> "/"); // Add virtual host
+        registry.add("spring.rabbitmq.connection-timeout", () -> "30000");
+        registry.add("spring.rabbitmq.requested-heartbeat", () -> "30");
     }
 
 
