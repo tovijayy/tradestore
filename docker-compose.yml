@@ -1,0 +1,24 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # Management Console
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  trade-store:
+    image: trade-store:latest
+    container_name: trade-store
+    depends_on:
+      - rabbitmq
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:h2:mem:tradedb
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      HAZELCAST_CLUSTER_NAME: trade-cluster

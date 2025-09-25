@@ -22,7 +22,7 @@ public class TradeMessageListener {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @RabbitListener(queues = "${app.rabbitmq.queue}")
+    @RabbitListener(queues = "${app.rabbitmq.queue}", containerFactory = "rabbitListenerContainerFactory")
     public void receiveMessage(String message) {
         try {
             SqlTrade trade = objectMapper.readValue(message, SqlTrade.class);
